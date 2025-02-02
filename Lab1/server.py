@@ -78,23 +78,7 @@ def validate_input(data):
         return False
     return True
 
-# Step 6: Simulate monitoring in production
-def simulate_monitoring():
-    response_times = []
-    
-    for i in range(200):
-        start_time = time.time()
-        response = app.test_client().post('/predict', 
-                                          json={'features': [5.1, 3.5, 1.4, 0.2]}, 
-                                          headers={'x-api-key' :'my_secret_key'})
-        response_time = time.time() - start_time
-        response_times.append(response_time)
-    
-    plt.plot(response_times)
-    plt.xlabel('Iteration')
-    plt.ylabel('Response Time (seconds)')
-    plt.title('API Response Time vs Iteration')
-    plt.show()
+
 
 if __name__ == '__main__':
     # Load and preprocess data
