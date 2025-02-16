@@ -1,0 +1,6 @@
+1. The quick brown fox jumps over the lazy dog.	fox
+2. She sells seashells by the seashore.	seashells
+3. How much wood would a woodchuck chuck if a woodchuck could chuck wood?	woodchuck
+4. Peter Piper picked a peck of pickled peppers.	peppers
+5. A journey of a thousand miles begins with a single step.	journey
+6. To be or not to be, that is the question.	question
