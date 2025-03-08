@@ -4,7 +4,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score
 from collections import Counter
-from sklearn.utils import resample
 
 
 def load_and_split_data():
@@ -26,51 +25,19 @@ def sim_covariate_shift(test_data):
     test_shifted = test_data + np.random.normal(0, 0.5, test_data.shape)
     return test_shifted
 
-def sim_label_shift(data_set):
-    #separate existing classes
-    class3 = data_set[data_set['quality'] == 3]
-    class4 = data_set[data_set['quality'] == 4]
-    class5 = data_set[data_set['quality'] == 5]
-    class6 = data_set[data_set['quality'] == 6]
-    class7 = data_set[data_set['quality'] == 7]
-    class8 = data_set[data_set['quality'] == 8]
-    class9 = data_set[data_set['quality'] == 9]
+def sim_label_shift(test_df, target_distribution):
+    # Determine the number of samples needed for each label to match the target distribution
+    total_samples = len(test_df)
+    samples_needed = {label: int(total_samples * target_distribution[label]) for label in target_distribution}
+    
+    # Create a new test set with the desired distribution
+    new_test_df = pd.DataFrame()
+    for label, count in samples_needed.items():
+        label_samples = test_df[test_df['quality'] == label].sample(count, replace=True, random_state=42)
+        new_test_df = pd.concat([new_test_df, label_samples])
+    
+    return new_test_df
 
-    #Determine total number of samples, and desired class distribution
-    n_samples = len(data_set)
-    p_3 = .05
-    p_4 = .2
-    p_5 = .2
-    p_6 = .2
-    p_7 = .2
-    p_8 = .1
-    p_9 = .05
-
-    #Calculate number of desired samples for each class
-    n_class_3 = int(n_samples * p_3)
-    n_class_4 = int(n_samples * p_4)
-    n_class_5 = int(n_samples * p_5)
-    n_class_6 = int(n_samples * p_6)
-    n_class_7 = int(n_samples * p_7)
-    n_class_8 = int(n_samples * p_8)
-    n_class_9 = int(n_samples * p_9)
-
-    #resample based on desired number of records calculated
-    class_3_resampled = resample(class3, replace=True, n_samples=n_class_3, random_state=42)
-    class_4_resampled = resample(class4, replace=True, n_samples=n_class_4, random_state=42)
-    class_5_resampled = resample(class5, replace=True, n_samples=n_class_5, random_state=42)
-    class_6_resampled = resample(class6, replace=True, n_samples=n_class_6, random_state=42)
-    class_7_resampled = resample(class7, replace=True, n_samples=n_class_7, random_state=42)
-    class_8_resampled = resample(class8, replace=True, n_samples=n_class_8, random_state=42)
-    class_9_resampled = resample(class9, replace=True, n_samples=n_class_9, random_state=42)
-
-    #merge datasets back into a single dataframe
-    resampled = pd.concat([class_3_resampled, class_4_resampled, class_5_resampled, class_6_resampled, class_7_resampled, class_8_resampled, class_9_resampled])
-
-    #Shuffle the deck
-    resampled = resampled.sample(frac=1, random_state=42).reset_index(drop=True)
-
-    return resampled.drop(labels='quality', axis=1), resampled['quality']
 
 
 def train_model(features_train, target_train):
@@ -91,32 +58,31 @@ def model_acc(model, features_test, target_test):
 
 
 if __name__ == "__main__":
+    #load data and train model
     df, features_train, target_train, features_val, features_test, target_val, target_test = load_and_split_data()
-
-    print("Baseline Class distribution:", Counter(target_train))
-
     model = train_model(features_train, target_train)
 
-    #Simulate shifts
-    co_shifted_test = sim_covariate_shift(features_test)
-
-    class_rebalance = features_train.join(target_train)
-
-    print(len(class_rebalance), "vs", len(features_train))
-    
-    label_shifted_features, label_shifted_target = sim_label_shift(features_train.join(target_train))
-
-    print("Current Class distribution:", Counter(label_shifted_target))
-
-    #calculate accuracy considering shifts
+    #Identify baseline
+    print("Baseline Class distribution:", Counter(target_test))
     acc, f1 = model_acc(model, features_test, target_test)
-    s_acc, s_f1 = model_acc(model, co_shifted_test, target_test)
-    #l_acc, l_f1 = model_acc(model, label_shifted_test, target_test)
-
-
     print("Accuracy baseline:", acc)
     print("F1 baseline:", f1)
+
+    #Simulate covariate shift
+    co_shifted_test = sim_covariate_shift(features_test)
+    s_acc, s_f1 = model_acc(model, co_shifted_test, target_test)
     print("Accuracy with covariate shift:", s_acc)
     print("F1 with covariate shift:", s_f1)
+
+    #simulate label shift and confirm class distribution change.
+    whole_test_set = features_test.join(target_test)
+    target_distribution = {3: .1, 4: .1, 5:.2, 6:.3, 7:.2, 8:.1}
+    label_shifted_set = sim_label_shift(whole_test_set, target_distribution)
+
+    print("Current Class distribution:", Counter(label_shifted_set['quality']))
+
+    #retrain model with new class distribution
+    #l_acc, l_f1 = model_acc(model, label_shifted_test, target_test)
+
     # print("Accuracy with label shift:", l_acc)
     # print("F1 with label shift:", l_f1)
