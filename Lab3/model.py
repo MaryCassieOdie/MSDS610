@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from collections import Counter
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def load_and_split_data():
@@ -38,7 +40,9 @@ def sim_label_shift(test_df, target_distribution):
     
     return new_test_df
 
-
+def sim_concept_shift(test_data):
+    test_data['alcohol'] += np.random.normal(2, 0.5, size=test_data.shape[0])
+    return test_data
 
 def train_model(features_train, target_train):
     # Train model
@@ -46,14 +50,24 @@ def train_model(features_train, target_train):
     model.fit(features_train, target_train)
     return model
 
-def model_acc(model, features_test, target_test):
-    # Make prediction
-    pred = model.predict(features_test)
+def model_acc(pred, target_test):
     # Create evaluation metrics
     f1 = f1_score(target_test, pred, average='weighted')
     acc = accuracy_score(target_test, pred)
-
     return acc, f1
+
+def make_prediction(model, features):
+    pred = model.predict(features) 
+    return pred
+
+def confu_matrix(pred, true_set, name):
+    cm = confusion_matrix(true_set, pred)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['3', '4', '5', '6', '7', '8'], yticklabels=['3', '4', '5', '6', '7', '8'])
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title(name)
+    plt.show()
 
 
 
@@ -64,25 +78,37 @@ if __name__ == "__main__":
 
     #Identify baseline
     print("Baseline Class distribution:", Counter(target_test))
-    acc, f1 = model_acc(model, features_test, target_test)
+    base_pred = make_prediction(model, features_test)
+    acc, f1 = model_acc(base_pred, target_test)
     print("Accuracy baseline:", acc)
     print("F1 baseline:", f1)
+    confu_matrix(base_pred, target_test, 'Baseline')
 
     #Simulate covariate shift
-    co_shifted_test = sim_covariate_shift(features_test)
-    s_acc, s_f1 = model_acc(model, co_shifted_test, target_test)
+    covar_shifted_test = sim_covariate_shift(features_test)
+    covar_pred = make_prediction(model, covar_shifted_test)
+    s_acc, s_f1 = model_acc(covar_pred, target_test)
     print("Accuracy with covariate shift:", s_acc)
     print("F1 with covariate shift:", s_f1)
+    confu_matrix(covar_pred, target_test, 'Covariate Shift')
 
     #simulate label shift and confirm class distribution change.
     whole_test_set = features_test.join(target_test)
     target_distribution = {3: .1, 4: .1, 5:.2, 6:.3, 7:.2, 8:.1}
     label_shifted_set = sim_label_shift(whole_test_set, target_distribution)
+    print("Class distribution after label shift:", Counter(label_shifted_set['quality']))
 
-    print("Current Class distribution:", Counter(label_shifted_set['quality']))
+    #Generate performance metrics considering label shift
+    label_pred = make_prediction(model, label_shifted_set.drop('quality', axis=1))
+    l_acc, l_f1 = model_acc(label_pred, label_shifted_set['quality'])
+    print("Accuracy with label shift:", l_acc)
+    print("F1 with label shift:", l_f1)
+    confu_matrix(label_pred, label_shifted_set['quality'], 'Label Shift')
 
-    #retrain model with new class distribution
-    #l_acc, l_f1 = model_acc(model, label_shifted_test, target_test)
-
-    # print("Accuracy with label shift:", l_acc)
-    # print("F1 with label shift:", l_f1)
+    #Simulate concept shift
+    con_shifted_test = sim_concept_shift(features_test)
+    con_pred = make_prediction(model, con_shifted_test)
+    s_acc, s_f1 = model_acc(con_pred, target_test)
+    print("Accuracy with Concept shift:", s_acc)
+    print("F1 with Concept shift:", s_f1)
+    confu_matrix(con_pred, target_test, 'Concept Shift')
