@@ -6,6 +6,8 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from collections import Counter
 import matplotlib.pyplot as plt
 import seaborn as sns
+import scipy.stats as stats
+
 
 
 def load_and_split_data():
@@ -69,6 +71,25 @@ def confu_matrix(pred, true_set, name):
     plt.title(name)
     plt.show()
 
+def show_distribution(sample, name, bin_num):
+    plt.figure(figsize=(10, 5))
+    plt.hist(sample, bins=bin_num, edgecolor='k', alpha=0.7)
+    plt.title('Feature Distribution - Histogram')
+    plt.xlabel(name)
+    plt.ylabel('Frequency')
+    plt.show()
+
+
+def retrain_model(model, orig_train_features, orig_train_target, new_train_features, new_train_target):
+
+    # Combine the initial and new data
+    X_combined = pd.concat((orig_train_features, new_train_features), axis=0)
+    y_combined = pd.concat((orig_train_target, new_train_target), axis=0)
+
+    # Retrain the Random Forest model with the combined data
+    model.fit(X_combined, y_combined)
+
+    return model
 
 
 if __name__ == "__main__":
@@ -83,6 +104,8 @@ if __name__ == "__main__":
     print("Accuracy baseline:", acc)
     print("F1 baseline:", f1)
     confu_matrix(base_pred, target_test, 'Baseline')
+    show_distribution(features_train['alcohol'], 'Alcohol Feature - Training Set',15)
+    show_distribution(target_train, 'Quality Target - Training Set', 6)
 
     #Simulate covariate shift
     covar_shifted_test = sim_covariate_shift(features_test)
@@ -91,6 +114,8 @@ if __name__ == "__main__":
     print("Accuracy with covariate shift:", s_acc)
     print("F1 with covariate shift:", s_f1)
     confu_matrix(covar_pred, target_test, 'Covariate Shift')
+    print("Covariate Chi Test")
+    show_distribution(features_train['alcohol'], 'Alcohol Feature - Covariate Shifted Set', 15)
 
     #simulate label shift and confirm class distribution change.
     whole_test_set = features_test.join(target_test)
@@ -104,6 +129,7 @@ if __name__ == "__main__":
     print("Accuracy with label shift:", l_acc)
     print("F1 with label shift:", l_f1)
     confu_matrix(label_pred, label_shifted_set['quality'], 'Label Shift')
+    show_distribution(label_shifted_set['quality'], 'Quality Target - Label Shifted Set', 6)
 
     #Simulate concept shift
     con_shifted_test = sim_concept_shift(features_test)
@@ -112,3 +138,15 @@ if __name__ == "__main__":
     print("Accuracy with Concept shift:", s_acc)
     print("F1 with Concept shift:", s_f1)
     confu_matrix(con_pred, target_test, 'Concept Shift')
+    show_distribution(con_shifted_test['alcohol'], 'Alcohol Feature - Concept Shifted Set', 15)
+
+    #retrain model on shifted data and test performance
+    retrain_model(model, features_train, target_train, label_shifted_set.drop('quality', axis=1), label_shifted_set['quality'])
+    whole_valid_set = features_val.join(target_val)
+    target_distribution = {3: .1, 4: .1, 5:.2, 6:.3, 7:.2, 8:.1}
+    shifted_validation_set = sim_label_shift(whole_valid_set, target_distribution)
+    valid_pred = make_prediction(model, shifted_validation_set.drop('quality', axis=1))
+    v_acc, v_f1 = model_acc(valid_pred, shifted_validation_set['quality'])
+    print("Accuracy after retrain:", v_acc)
+    print("F1 after retrain:", v_f1)
+
