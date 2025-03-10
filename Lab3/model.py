@@ -114,8 +114,7 @@ if __name__ == "__main__":
     print("Accuracy with covariate shift:", s_acc)
     print("F1 with covariate shift:", s_f1)
     confu_matrix(covar_pred, target_test, 'Covariate Shift')
-    print("Covariate Chi Test")
-    show_distribution(features_train['alcohol'], 'Alcohol Feature - Covariate Shifted Set', 15)
+    show_distribution(covar_shifted_test['alcohol'], 'Alcohol Feature - Covariate Shifted Set', 15)
 
     #simulate label shift and confirm class distribution change.
     whole_test_set = features_test.join(target_test)
@@ -149,4 +148,5 @@ if __name__ == "__main__":
     v_acc, v_f1 = model_acc(valid_pred, shifted_validation_set['quality'])
     print("Accuracy after retrain:", v_acc)
     print("F1 after retrain:", v_f1)
+    confu_matrix(con_pred, target_test, 'After Retrain')
 
